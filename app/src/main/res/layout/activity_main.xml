@@ -6,9 +6,23 @@
     tools:context=".MainActivity">
 
     <WebView
-        android:id="@+id/webview"
+        android:id="@+id/webview_ding"
+        android:visibility="visible"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         />
+    <LinearLayout
+        android:id="@+id/image_logo"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:gravity="center|center_horizontal|center_vertical"
+        android:background="@color/logo_bg"
+        tools:ignore="MissingConstraints">
+        <ImageView
+            android:src="@mipmap/logo"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:contentDescription="@string/todo" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
