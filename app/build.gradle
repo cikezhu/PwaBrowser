@@ -67,3 +67,45 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 }
+
+task upgradeVersion {
+    group 'help'
+    description '构建新版本'
+    doLast {
+        println("---自动升级版本号---\n")
+        if (versionPropsFile.exists()) {
+            versionProps.load(new FileInputStream(versionPropsFile))
+        }
+        String oldVersionCode = versionProps['versionCode']
+        String oldVersionName = versionProps['versionName']
+        if (oldVersionCode == null || oldVersionName == null ||
+                oldVersionCode.isEmpty() || oldVersionName.isEmpty()) {
+            println("error:版本号不能为空")
+            return;
+        }
+        versionProps['versionCode'] = String.valueOf(versionProps['versionCode'].toInteger() + 1)
+        String str = versionProps['versionName'].toString()
+        versionProps['versionName'] = str.substring(0, str.lastIndexOf('.') + 1) +
+                (str.substring(str.lastIndexOf('.') + 1).toInteger() + 1)
+        String tip =
+                "版本号从$oldVersionName($oldVersionCode)升级到${versionProps['versionName']}(${versionProps['versionCode']})"
+        println(tip)
+
+        def writer = new FileWriter(versionPropsFile)
+        versionProps.store(writer, null)
+        writer.flush()
+        writer.close()
+        def tag = "v${versionProps['versionName']}"
+        cmdExecute("git pull")
+        cmdExecute("git add version.properties")
+        cmdExecute("git commit -m \"版本号升级为：$tag\"")
+        cmdExecute("git push github")
+        cmdExecute("git tag $tag")
+        cmdExecute("git push github $tag")
+    }
+}
+
+void cmdExecute(String cmd) {
+    println "\n执行$cmd"
+    println cmd.execute().text
+}
