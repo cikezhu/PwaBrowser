@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -7,49 +8,62 @@
 
     <WebView
         android:id="@+id/webview_ding"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:visibility="visible"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        >
-    </WebView>
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <LinearLayout
-        android:id="@+id/image_logo"
-        android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
-        android:gravity="center|center_horizontal|center_vertical"
+        android:id="@+id/bg_logo"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:background="@color/logo_bg"
+        android:gravity="center|center_horizontal|center_vertical"
         android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
         tools:ignore="MissingConstraints">
+
+        <ImageView
+            android:id="@+id/image_logo"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:contentDescription="@string/todo"
+            android:visibility="visible"
+            android:src="@mipmap/logo" />
 
         <TextView
             android:id="@+id/text_url"
-            android:visibility="gone"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="5dp"
+            android:textSize="18sp"
+            android:text="请输入你的nastool网址(包括端口)"
             android:textColor="#FFFFFF"
-            android:text="请输入你的nastool网址(包括端口)" />
+            android:visibility="gone" />
 
         <EditText
             android:id="@+id/input_url"
-            android:visibility="gone"
             android:layout_width="300dp"
-            android:textColor="#000000"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="5dp"
             android:background="@drawable/shape_input"
-            android:text="" />
+            android:text=""
+            android:textColor="#000000"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/button_change_url"
-            android:visibility="gone"
             android:layout_width="150dp"
             android:layout_height="wrap_content"
-            android:text="更改网址" />
-
-        <ImageView
-            android:src="@mipmap/logo"
-            android:layout_width="150dp"
-            android:layout_height="150dp"
-            android:contentDescription="@string/todo" />
+            android:layout_marginBottom="5dp"
+            android:text="更改网址"
+            android:visibility="gone" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
