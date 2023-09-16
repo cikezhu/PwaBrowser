@@ -16,6 +16,9 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat.startActivity
 import kotlinx.coroutines.*
+import java.io.*
+import java.net.HttpURLConnection
+import java.net.URL
 
 
 class MainActivity : AppCompatActivity() {
@@ -31,7 +34,6 @@ class MainActivity : AppCompatActivity() {
     private val buttonTextSave: String = "保存更改"
     var hostUrl: String = "" //"http://192.168.137.1:3000"
     val statusBarHeight: Int = 40
-    var toCssTop: Int = 5
     var firstUpdated: Boolean = true
 
 
@@ -162,7 +164,7 @@ class MainActivity : AppCompatActivity() {
         settings.allowUniversalAccessFromFileURLs = true // 是否应允许在文件方案URL上下文中运行的 JavaScript 访问任何来源的内容
         //myWebView.setDrawingCacheEnabled(true) // 启用或禁用图形缓存
         myWebView.webViewClient = WVViewClient(this, this@MainActivity) // 帮助 WebView 处理各种通知、请求事件
-        myWebView.webChromeClient = WVChromeClient(this, this@MainActivity) // 处理解析，渲染网页
+        // myWebView.webChromeClient = WVChromeClient(this, this@MainActivity) // 处理解析，渲染网页
         gotoUrl()
     }
 }
@@ -195,38 +197,64 @@ private class WVViewClient(private val _context: Context, private val _m: MainAc
         _m.firstUpdated = false
     }
 
+    override fun shouldInterceptRequest(
+        view: WebView?,
+        request: WebResourceRequest
+    ): WebResourceResponse? {
+        val url = request.url.toString()
+        // 判断是否为CSS文件
+        if (url.endsWith(".css")) {
+            // 获取原始CSS文件的输入流
+            var inputStream: InputStream? = null
+            try {
+                val connection: HttpURLConnection = URL(request.url.toString()).openConnection() as HttpURLConnection
+                inputStream = connection.inputStream
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+            // 将输入流转换为字符串，并进行相应的替换操作
+            var cssString = convertStreamToString(inputStream!!)
+            // 将IOS的安全边距进行替换
+            cssString = cssString.replace("env(safe-area-inset-top)", "" + _m.statusBarHeight + "px")
+
+            // 返回新的WebResourceResponse对象，以替换原始的CSS文件
+            return WebResourceResponse(
+                "text/css",
+                "UTF-8",
+                ByteArrayInputStream(cssString.toByteArray())
+            )
+        }
+        return super.shouldInterceptRequest(view, request)
+    }
+
+    private fun convertStreamToString(inputStream: InputStream): String {
+        val reader = BufferedReader(InputStreamReader(inputStream))
+        val stringBuilder = StringBuilder()
+        var line: String?
+        try {
+            while (reader.readLine().also { line = it } != null) {
+                stringBuilder.append(line).append("\n")
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+        } finally {
+            try {
+                inputStream.close()
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
+        return stringBuilder.toString()
+    }
+
     //页面加载完成
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
-        // 设定安全top边距
-        if (_m.toCssTop > 0) {
-            _m.toCssTop = _m.toCssTop - 1
-            view?.loadUrl("javascript:" +
-                    "document.getElementsByTagName('body')[0].style.setProperty('--safe-area-inset-top', '" +
-                    _m.statusBarHeight +
-                    "px');")
-        }
         // 关闭logo图
         if (_m.firstUpdated) {
             _m.firstUpdated = false
             _m.hideBgLogo()
         }
-    }
-
-}
-
-class WVChromeClient(private val _context: Context, private val _m: MainActivity) :
-    WebChromeClient() {
-    override fun onProgressChanged(view: WebView, newProgress: Int) {
-        super.onProgressChanged(view, newProgress)
-        Log.d("WVChromeClient", "newProgress：$newProgress")
-    }
-
-    // 标题变更时恢复toCssTop变量
-    override fun onReceivedTitle(view: WebView?, title: String) {
-        super.onReceivedTitle(view, title)
-        Log.d("WVChromeClient", "onReceivedTitle: $title")
-        _m.toCssTop = 5
     }
 
 }
