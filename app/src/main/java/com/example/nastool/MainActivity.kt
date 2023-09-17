@@ -40,8 +40,9 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingInflatedId", "CommitPrefEdits")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        initializeServiceWorker()
         setContentView(R.layout.activity_main)
-        initialize()
+        initializeWebView()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -107,8 +108,76 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun convertStreamToString(inputStream: InputStream): String {
+        val reader = BufferedReader(InputStreamReader(inputStream))
+        val stringBuilder = StringBuilder()
+        var line: String?
+        try {
+            while (reader.readLine().also { line = it } != null) {
+                stringBuilder.append(line).append("\n")
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+        } finally {
+            try {
+                inputStream.close()
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
+        return stringBuilder.toString()
+    }
+
+    fun replaceCss(request: WebResourceRequest): WebResourceResponse? {
+        val url = request.url.toString()
+        // 判断是否为CSS文件
+        if (url.endsWith(".css")) {
+            // 获取原始CSS文件的输入流
+            var inputStream: InputStream? = null
+            try {
+                val connection: HttpURLConnection =
+                    URL(request.url.toString()).openConnection() as HttpURLConnection
+                inputStream = connection.inputStream
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+            // 将输入流转换为字符串，并进行相应的替换操作
+            var cssString = convertStreamToString(inputStream!!)
+            // 将IOS的安全边距进行替换
+            cssString = cssString.replace("env(safe-area-inset-top)", "" + statusBarHeight + "px")
+
+            // 返回新的WebResourceResponse对象，以替换原始的CSS文件
+            return WebResourceResponse(
+                "text/css",
+                "UTF-8",
+                ByteArrayInputStream(cssString.toByteArray())
+            )
+        }
+        return null
+    }
+
+    private fun initializeServiceWorker() {
+        // 配置 Service Worker 拦截
+        val swController = ServiceWorkerController.getInstance()
+        swController.serviceWorkerWebSettings.allowContentAccess = true
+        swController.setServiceWorkerClient(object : ServiceWorkerClient() {
+            override fun shouldInterceptRequest(request: WebResourceRequest): WebResourceResponse? {
+                Log.e(
+                    "serviceWorker",
+                    "shouldInterceptRequest: " + request.isForMainFrame + ": " + request.url
+                )
+                val response = replaceCss(request)
+                return if (response !== null) {
+                    response
+                } else {
+                    super.shouldInterceptRequest(request)
+                }
+            }
+        })
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
-    private fun initialize() {
+    private fun initializeWebView() {
         // 读取配置
         mySharedPreferences = getSharedPreferences("nasTool", MODE_PRIVATE)
         hostUrl = mySharedPreferences.getString("hostUrl", "") ?: return
@@ -147,6 +216,7 @@ class MainActivity : AppCompatActivity() {
 
         // 配置 web view
         myWebView = findViewById(R.id.webview_ding)
+        WebView.setWebContentsDebuggingEnabled(true)
         val settings: WebSettings = myWebView.settings // webView 配置项
         settings.useWideViewPort = true // 是否启用对视口元标记的支持
         settings.javaScriptEnabled = true // 是否启用 JavaScript
@@ -201,50 +271,16 @@ private class WVViewClient(private val _context: Context, private val _m: MainAc
         view: WebView?,
         request: WebResourceRequest
     ): WebResourceResponse? {
-        val url = request.url.toString()
-        // 判断是否为CSS文件
-        if (url.endsWith(".css")) {
-            // 获取原始CSS文件的输入流
-            var inputStream: InputStream? = null
-            try {
-                val connection: HttpURLConnection = URL(request.url.toString()).openConnection() as HttpURLConnection
-                inputStream = connection.inputStream
-            } catch (e: IOException) {
-                e.printStackTrace()
-            }
-            // 将输入流转换为字符串，并进行相应的替换操作
-            var cssString = convertStreamToString(inputStream!!)
-            // 将IOS的安全边距进行替换
-            cssString = cssString.replace("env(safe-area-inset-top)", "" + _m.statusBarHeight + "px")
-
-            // 返回新的WebResourceResponse对象，以替换原始的CSS文件
-            return WebResourceResponse(
-                "text/css",
-                "UTF-8",
-                ByteArrayInputStream(cssString.toByteArray())
-            )
+        Log.e(
+            "WebView",
+            "shouldInterceptRequest: " + request.isForMainFrame + ": " + request.url
+        )
+        val response = _m.replaceCss(request)
+        return if (response !== null) {
+            response
+        } else {
+            super.shouldInterceptRequest(view, request)
         }
-        return super.shouldInterceptRequest(view, request)
-    }
-
-    private fun convertStreamToString(inputStream: InputStream): String {
-        val reader = BufferedReader(InputStreamReader(inputStream))
-        val stringBuilder = StringBuilder()
-        var line: String?
-        try {
-            while (reader.readLine().also { line = it } != null) {
-                stringBuilder.append(line).append("\n")
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-        } finally {
-            try {
-                inputStream.close()
-            } catch (e: IOException) {
-                e.printStackTrace()
-            }
-        }
-        return stringBuilder.toString()
     }
 
     //页面加载完成
