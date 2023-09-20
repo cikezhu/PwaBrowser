@@ -1,4 +1,4 @@
-package com.example.nastool
+package ddd.pwa.browser
 
 import org.junit.Test
 

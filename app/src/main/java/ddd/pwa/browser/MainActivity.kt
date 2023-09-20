@@ -1,4 +1,4 @@
-package com.example.nastool
+package ddd.pwa.browser
 
 import android.annotation.SuppressLint
 import android.content.Context

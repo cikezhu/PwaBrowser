@@ -17,11 +17,11 @@ if (versionPropsFile.exists()) {
 }
 
 android {
-    namespace 'com.example.nastool'
+    namespace 'ddd.pwa.browser'
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.example.nastool"
+        applicationId "ddd.pwa.browser"
         minSdk 24
         targetSdk 33
         versionCode versionProps['versionCode'].toInteger()
