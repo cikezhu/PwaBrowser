@@ -179,7 +179,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun initializeWebView() {
         // 读取配置
-        mySharedPreferences = getSharedPreferences("nasTool", MODE_PRIVATE)
+        mySharedPreferences = getSharedPreferences("pwaBrowser", MODE_PRIVATE)
         hostUrl = mySharedPreferences.getString("hostUrl", "") ?: return
 
         // 绑定组件

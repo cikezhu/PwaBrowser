@@ -24,7 +24,7 @@
         android:icon="@mipmap/logo"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Nastool"
+        android:theme="@style/Theme.PwaBrowser"
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"

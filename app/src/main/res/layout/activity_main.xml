@@ -43,7 +43,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="5dp"
             android:textSize="18sp"
-            android:text="请输入你的nastool网址(包括端口)"
+            android:text="请输入webapp网址(包括端口)"
             android:textColor="#FFFFFF"
             android:visibility="gone" />
 
