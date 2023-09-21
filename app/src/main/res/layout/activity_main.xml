@@ -6,16 +6,6 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <WebView
-        android:id="@+id/webview_ding"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="visible"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
     <LinearLayout
         android:id="@+id/bg_logo"
         android:layout_width="0dp"
@@ -29,14 +19,6 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:ignore="MissingConstraints">
 
-        <ImageView
-            android:id="@+id/image_logo"
-            android:layout_width="150dp"
-            android:layout_height="150dp"
-            android:contentDescription="@string/todo"
-            android:visibility="visible"
-            android:src="@mipmap/logo" />
-
         <TextView
             android:id="@+id/text_url"
             android:layout_width="wrap_content"
@@ -44,8 +26,7 @@
             android:layout_marginBottom="5dp"
             android:textSize="18sp"
             android:text="请输入webapp网址(包括端口)"
-            android:textColor="#FFFFFF"
-            android:visibility="gone" />
+            android:textColor="#FFFFFF" />
 
         <EditText
             android:id="@+id/input_url"
@@ -54,16 +35,14 @@
             android:layout_marginBottom="5dp"
             android:background="@drawable/shape_input"
             android:text=""
-            android:textColor="#000000"
-            android:visibility="gone" />
+            android:textColor="#000000" />
 
         <Button
             android:id="@+id/button_change_url"
             android:layout_width="150dp"
             android:layout_height="wrap_content"
             android:layout_marginBottom="5dp"
-            android:text="更改网址"
-            android:visibility="gone" />
+            android:text="添加到桌面" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
