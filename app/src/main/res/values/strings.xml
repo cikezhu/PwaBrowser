@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">沉浸式浏览器</string>
+    <string name="app_name">沉浸浏览</string>
     <string name="todo">TODO</string>
     <string name="title_activity_web_view">WebViewActivity</string>
     <!-- Strings used for fragments for navigation -->

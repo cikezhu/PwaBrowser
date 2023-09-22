@@ -17,12 +17,12 @@
         <item name="android:colorBackground">@color/logo_bg</item>
     </style>
 
-    <style name="Theme.PwaBrowser.NoActionBar">
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
+    <style name="Theme.PwaBrowser.NoDisplay" parent="@style/Theme.PwaBrowser">
+        <item name="android:windowBackground">@null</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowNoDisplay">true</item>
+        <item name="android:windowDisablePreview">true</item>
     </style>
-
-    <style name="Theme.PwaBrowser.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
-
-    <style name="Theme.PwaBrowser.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 </resources>

@@ -20,7 +20,6 @@
         android:id="@+id/bg_logo"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/logo_bg"
         android:gravity="center|center_horizontal|center_vertical"
         android:orientation="vertical"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -31,8 +30,8 @@
 
         <ImageView
             android:id="@+id/image_logo"
-            android:layout_width="150dp"
-            android:layout_height="150dp"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
             android:contentDescription="@string/todo"
             android:src="@mipmap/logo"
             android:visibility="visible" />

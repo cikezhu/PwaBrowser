@@ -1,13 +1,19 @@
 package ddd.pwa.browser
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.app.ActivityManager.TaskDescription
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.net.http.SslError
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -20,38 +26,54 @@ import androidx.core.content.ContextCompat
 import java.io.*
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.*
 
 
 class WebViewActivity : AppCompatActivity() {
     val mTAG: String = "WebViewActivity"
+    lateinit var mySharedPreferences: SharedPreferences
     private lateinit var myWebView: WebView
+    private lateinit var myLinearLayout: LinearLayout
     private lateinit var myImageLogo: ImageView
     private val statusBarHeight: Int = 40
     var firstUpdated: Boolean = true
     var hostUrl: String = ""
-    var mode: Int? = null
+    private var mode: Int? = null
     var name: String = ""
+    var nameOK: Boolean = false
     var logo: Bitmap? = null
-    var color: Int = 0
+    var logoOK: Boolean = false
+    var bgColor: Int = 0
+    var bgColorOK: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
         // 获取传递过来的网址
         val url = intent.getStringExtra("url")
         mode = intent.getIntExtra("mode", LAUNCH_MODE.SHOW_URL_PAGE.intValue)
         name = intent.getStringExtra("name") ?: "沉浸浏览"
+        @Suppress("DEPRECATION")
         setTaskDescription(TaskDescription(name))
-        // 检查当前是否已经存在其他实例
-        if (!isTaskRoot && mode == LAUNCH_MODE.SHOW_URL_PAGE.intValue || url == null) {
+        if (url == null) {
             finish()
             return
+        } else {
+            // 绑定url地址
+            hostUrl = url
         }
+        // 初始化配置
+        mySharedPreferences = getSharedPreferences("mySharedPreferences", MODE_PRIVATE)
+        bgColor = mySharedPreferences.getInt("${url}bg_color", ContextCompat.getColor(this, R.color.logo_bg))
+        // 在设置布局之前设置窗口的背景色
+        window.setBackgroundDrawable(ColorDrawable(bgColor))
+        // 获取缓存的图标
+        logo = getBitmapFromCache()
+        super.onCreate(savedInstanceState)
         // 初始化ServiceWorker拦截
         initializeServiceWorker()
         // 载入界面布局
         setContentView(R.layout.activity_web_view)
         // 初始化webView
-        initializeWebView(url)
+        initializeWebView()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -63,18 +85,19 @@ class WebViewActivity : AppCompatActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    fun return_main() {
-        if (logo !== null) {
+    fun returnMain() {
+        if (logoOK && nameOK && bgColorOK) {
             if (mode == LAUNCH_MODE.GET_URL_DETAIL.intValue) {
+                Log.e(mTAG, "returnMain: url, $hostUrl")
+                Log.e(mTAG, "returnMain: name, $name")
                 val resultIntent = Intent()
                 resultIntent.putExtra("url", hostUrl)
                 resultIntent.putExtra("name", name)
-                resultIntent.putExtra("color", color)
                 resultIntent.putExtra("logo", logo)
                 setResult(RESULT_OK, resultIntent)
                 finish()
             } else {
-                val taskDescription = TaskDescription(name, logo)
+                @Suppress("DEPRECATION") val taskDescription = TaskDescription(name, logo)
                 setTaskDescription(taskDescription)
             }
         }
@@ -83,7 +106,23 @@ class WebViewActivity : AppCompatActivity() {
     fun hideBgLogo() {
         // 隐藏logo界面
         val logo: LinearLayout = findViewById(R.id.bg_logo)
-        logo.visibility = View.GONE
+        if (mode  == LAUNCH_MODE.GET_URL_DETAIL.intValue) {
+            logo.visibility = View.GONE
+        } else {
+            // 创建一个透明度动画
+            val alphaAnimation = ObjectAnimator.ofFloat(logo, "alpha", 1.0f, 0.0f)
+            // 设置动画持续时间
+            alphaAnimation.duration = 1000
+            // 添加动画监听器
+            alphaAnimation.addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    // 动画结束时隐藏 LinearLayout
+                    logo.visibility = View.GONE
+                }
+            })
+            // 开始动画
+            alphaAnimation.start()
+        }
     }
 
     private fun convertStreamToString(inputStream: InputStream): String {
@@ -104,6 +143,79 @@ class WebViewActivity : AppCompatActivity() {
             }
         }
         return stringBuilder.toString()
+    }
+
+    fun convertColorString(colorString: String): String {
+        var convertedColorString = colorString.trim('"', '\'').lowercase(Locale.ROOT)
+        if (convertedColorString.startsWith("#")) {
+            // 如果颜色值以 # 开头，则直接返回该值
+            return convertedColorString
+        }
+        if (convertedColorString.startsWith("rgb")) {
+            // 如果颜色值以 rgb 开头，则将其转换为 #RRGGBB 格式的颜色值
+            val matchResult = Regex("""\d+""").findAll(convertedColorString)
+            val rgbValues = matchResult.map { it.value.toInt() }.toList()
+            val hexValues = rgbValues.map { String.format("%02X", it) }
+            convertedColorString = "#${hexValues.joinToString(separator = "")}"
+        } else if (convertedColorString.startsWith("argb")) {
+            // 如果颜色值以 argb 开头，则将其转换为 #AARRGGBB 格式的颜色值
+            val matchResult = Regex("""\d+""").findAll(convertedColorString)
+            val argbValues = matchResult.map { it.value.toInt() }.toList()
+            val hexValues = argbValues.map { String.format("%02X", it) }
+            convertedColorString = "#${hexValues[0]}${hexValues.subList(1, 4).joinToString(separator = "")}"
+        }
+        return convertedColorString
+    }
+
+    // 编码字符串为Base64字符串
+    private fun encode(data: String): String {
+        return Base64.getEncoder().encodeToString(data.toByteArray())
+    }
+
+    // 解码Base64字符串为字符串
+    @Suppress("unused")
+    private fun decode(base64: String): String {
+        return String(Base64.getDecoder().decode(base64))
+    }
+
+    fun saveBitmapToCache(bitmap: Bitmap?) {
+        if (bitmap == null) {
+            return
+        }
+        try {
+            // 获取缓存目录
+            val cacheDir = cacheDir
+            // 创建文件对象
+            val file = File(cacheDir, encode(hostUrl))
+            // 创建文件输出流对象
+            val fos = FileOutputStream(file)
+            // 将Bitmap对象压缩为PNG格式并写入文件输出流
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+            // 关闭文件输出流
+            fos.close()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun getBitmapFromCache(): Bitmap? {
+        try {
+            // 获取缓存目录
+            val cacheDir = cacheDir
+            // 创建文件对象
+            val file = File(cacheDir, encode(hostUrl))
+            // 创建文件输入流对象
+            val fis = FileInputStream(file)
+            // 将文件输入流解码为Bitmap对象
+            val bitmap = BitmapFactory.decodeStream(fis)
+            // 关闭文件输入流
+            fis.close()
+            // 返回Bitmap对象
+            return bitmap
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        return null
     }
 
     fun replaceCss(request: WebResourceRequest): WebResourceResponse? {
@@ -155,15 +267,19 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun initializeWebView(url: String) {
-        // 绑定url地址
-        hostUrl = url
-
-        // 绑定组件
+    private fun initializeWebView() {
+        // 绑定组件 应用背景色和图标
+        myWebView = findViewById(R.id.webview_ding)
+        myWebView.setBackgroundColor(bgColor)
+        myLinearLayout = findViewById(R.id.bg_logo)
+        myLinearLayout.setBackgroundColor(bgColor)
         myImageLogo = findViewById(R.id.image_logo)
+        myImageLogo.setBackgroundColor(bgColor)
+        if (logo != null) {
+            myImageLogo.setImageBitmap(logo)
+        }
 
         // 配置 web view
-        myWebView = findViewById(R.id.webview_ding)
         WebView.setWebContentsDebuggingEnabled(true)
         val settings: WebSettings = myWebView.settings // webView 配置项
         settings.useWideViewPort = true // 是否启用对视口元标记的支持
@@ -189,20 +305,24 @@ class WebViewActivity : AppCompatActivity() {
 
 }
 
+@Suppress("unused")
 private class WVChromeClient(private val _context: Context, private val _m: WebViewActivity):
     WebChromeClient() {
     override fun onReceivedTitle(view: WebView?, title: String?) {
         super.onReceivedTitle(view, title)
         _m.name = title ?: "PWA"
         Log.d(_m.mTAG, "onReceivedTitle: ${_m.name}")
-        _m.return_main()
+        _m.nameOK = true
+        _m.returnMain()
     }
 
     override fun onReceivedIcon(view: WebView?, icon: Bitmap?) {
         super.onReceivedIcon(view, icon)
         _m.logo = icon
+        _m.saveBitmapToCache(icon)
         Log.d(_m.mTAG, "onReceivedIcon: ok")
-        _m.return_main()
+        _m.logoOK = true
+        _m.returnMain()
     }
 }
 
@@ -258,12 +378,19 @@ private class WVViewClient(private val _context: Context, private val _m: WebVie
             _m.firstUpdated = false
             _m.hideBgLogo()
         }
-//        // 获取网站背景色
-//        view!!.evaluateJavascript("(function() { return window.getComputedStyle(document.body).backgroundColor; })();"
-//        ) { value ->
-//            val hexColor = value.replace("\"".toRegex(), "")
-//            _m.color = 0 // hexColor 暂时放弃
-//        }
+        // 使用JavaScript获取网站的背景颜色
+        val js = "javascript:window.getComputedStyle(document.body).backgroundColor;"
+        view?.evaluateJavascript(js) { result ->
+            val newResult = _m.convertColorString(result)
+            Log.e(_m.mTAG, "onPageFinished: $result  $newResult")
+            if (newResult != "") {
+                _m.bgColor = Color.parseColor(newResult)
+                _m.mySharedPreferences.edit().putInt("${url}bg_color", _m.bgColor).apply()
+            }
+            Log.e(_m.mTAG, "onPageFinished: ${_m.bgColor}")
+            _m.bgColorOK = true
+            _m.returnMain()
+        }
     }
 
 }

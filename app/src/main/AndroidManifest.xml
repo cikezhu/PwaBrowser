@@ -12,8 +12,10 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -31,13 +33,6 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <activity
-            android:name=".WebViewActivity"
-            android:exported="false"
-            android:label="@string/title_activity_web_view"
-            android:documentLaunchMode="intoExisting"
-            android:launchMode="standard"
-            android:theme="@style/Theme.PwaBrowser.NoActionBar" />
-        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
@@ -46,6 +41,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".WebViewActivity"
+            android:exported="false"
+            android:label="@string/title_activity_web_view"
+            android:documentLaunchMode="intoExisting"
+            android:launchMode="standard" />
+        <activity
+            android:theme="@style/Theme.PwaBrowser.NoDisplay"
+            android:name=".LauncherShortcutActivity"
+            android:exported="false"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"/>
     </application>
 
 </manifest>

@@ -1,5 +1,6 @@
 package ddd.pwa.browser
 
+import android.R.attr.bitmap
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
@@ -15,6 +16,7 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.*
+import java.io.ByteArrayOutputStream
 
 
 class MainActivity : AppCompatActivity() {
@@ -28,10 +30,9 @@ class MainActivity : AppCompatActivity() {
             Log.e(mTAG, data.toString())
             val url = data!!.getStringExtra("url")
             val name = data.getStringExtra("name")
-            val color = data.getIntExtra("color", R.color.logo_bg)
-            val logo = data.getParcelableExtra<Bitmap>("logo")
+            @Suppress("DEPRECATION") val logo = data.getParcelableExtra<Bitmap>("logo")
             if (url !== null && name !== null && logo !== null) {
-                addShortcut(name, url, color, logo)
+                addShortcut(name, url, logo)
             }
         }
     }
@@ -64,20 +65,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun addShortcut(name: String, url: String, color: Int, logo: Bitmap) {
-        // 创建快捷方式的Intent
-        val shortcutIntent = Intent(applicationContext, WebViewActivity::class.java)
-        shortcutIntent.action = Intent.ACTION_MAIN
-        shortcutIntent.putExtra("mode", LAUNCH_MODE.SHOW_URL_PAGE.intValue)
-        shortcutIntent.putExtra("url", url);
-        shortcutIntent.putExtra("color", color);
-        shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    private fun addShortcut(name: String, url: String, logo: Bitmap) {
         // 创建快捷方式
         val shortcutInfo = ShortcutInfo.Builder(applicationContext, url)
             .setShortLabel(name)
             .setIcon(Icon.createWithBitmap(logo))
-            .setIntent(shortcutIntent)
+            .setIntent(Intent(applicationContext, LauncherShortcutActivity::class.java).apply {
+                action = Intent.ACTION_MAIN
+                putExtra("mode", LAUNCH_MODE.SHOW_URL_PAGE.intValue)
+                putExtra("url", url)
+                putExtra("name", name)
+            })
             .build()
         // 添加快捷方式到桌面
         mScope.launch(Dispatchers.Main) {
