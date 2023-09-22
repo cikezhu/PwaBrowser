@@ -78,7 +78,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 }
 
-task upgradeVersion {
+task updatever {
     group 'help'
     description '构建新版本'
     doLast {
@@ -107,7 +107,7 @@ task upgradeVersion {
         writer.close()
         def tag = "v${versionProps['versionName']}"
         cmdExecute("git pull")
-        cmdExecute("git add ../version.properties")
+        cmdExecute("git add ./version.properties")
         cmdExecute("git commit -m \"版本号升级为：$tag\"")
         cmdExecute("git push github")
         cmdExecute("git tag $tag")
