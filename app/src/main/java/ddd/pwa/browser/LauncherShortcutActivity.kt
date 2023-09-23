@@ -3,7 +3,6 @@ package ddd.pwa.browser
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
@@ -15,7 +14,7 @@ class LauncherShortcutActivity : AppCompatActivity() {
         if (intent.hasExtra("mode") && intent.hasExtra("url")) {
             val newIntent = createIntent(intent)
             if (newIntent != null) {
-                newIntent.putExtra("mode", intent.getStringExtra("mode"))
+                newIntent.putExtra("mode", intent.getIntExtra("mode", LAUNCH_MODE.SHOW_URL_PAGE.intValue))
                 newIntent.putExtra("url", intent.getStringExtra("url"))
                 newIntent.putExtra("name", intent.getStringExtra("name"))
                 startActivity(newIntent)

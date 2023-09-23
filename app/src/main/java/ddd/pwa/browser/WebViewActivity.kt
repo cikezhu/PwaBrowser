@@ -18,6 +18,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup.MarginLayoutParams
 import android.webkit.*
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -31,6 +32,7 @@ import java.util.*
 
 class WebViewActivity : AppCompatActivity() {
     val mTAG: String = "WebViewActivity"
+    var isFull: Boolean = true
     lateinit var mySharedPreferences: SharedPreferences
     private lateinit var myWebView: WebView
     private lateinit var myLinearLayout: LinearLayout
@@ -62,7 +64,8 @@ class WebViewActivity : AppCompatActivity() {
         }
         // 初始化配置
         mySharedPreferences = getSharedPreferences("mySharedPreferences", MODE_PRIVATE)
-        bgColor = mySharedPreferences.getInt("${url}bg_color", ContextCompat.getColor(this, R.color.logo_bg))
+        val parsedUrl = URL(url)
+        bgColor = mySharedPreferences.getInt("${parsedUrl.host}:${parsedUrl.port}bg_color", ContextCompat.getColor(this, R.color.logo_bg))
         // 在设置布局之前设置窗口的背景色
         window.setBackgroundDrawable(ColorDrawable(bgColor))
         // 获取缓存的图标
@@ -100,6 +103,14 @@ class WebViewActivity : AppCompatActivity() {
                 @Suppress("DEPRECATION") val taskDescription = TaskDescription(name, logo)
                 setTaskDescription(taskDescription)
             }
+        }
+    }
+
+    fun setNotFull() {
+        if (isFull) {
+            isFull = false
+            val param = myWebView.layoutParams as MarginLayoutParams
+            param.setMargins(0, (statusBarHeight * resources.displayMetrics.density).toInt(), 0, 0)
         }
     }
 
@@ -168,7 +179,7 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     // 编码字符串为Base64字符串
-    private fun encode(data: String): String {
+    fun encode(data: String): String {
         return Base64.getEncoder().encodeToString(data.toByteArray())
     }
 
@@ -233,8 +244,16 @@ class WebViewActivity : AppCompatActivity() {
             }
             // 将输入流转换为字符串，并进行相应的替换操作
             var cssString = convertStreamToString(inputStream!!)
-            // 将IOS的安全边距进行替换
-            cssString = cssString.replace("env(safe-area-inset-top)", "" + statusBarHeight + "px")
+            // 如果存在IOS的安全边距
+            val safe = "env(safe-area-inset-top)"
+            if (cssString.indexOf(safe) > -1) {
+                // 将IOS的安全边距进行替换
+                cssString = cssString.replace(safe, "" + statusBarHeight + "px")
+                Log.w(
+                    mTAG,
+                    "replaceCss, 替换成功: " + request.isForMainFrame + ": " + request.url
+                )
+            }
 
             // 返回新的WebResourceResponse对象，以替换原始的CSS文件
             return WebResourceResponse(
@@ -379,17 +398,37 @@ private class WVViewClient(private val _context: Context, private val _m: WebVie
             _m.hideBgLogo()
         }
         // 使用JavaScript获取网站的背景颜色
-        val js = "javascript:window.getComputedStyle(document.body).backgroundColor;"
+        var js = "javascript:window.getComputedStyle(document.body).backgroundColor;"
         view?.evaluateJavascript(js) { result ->
             val newResult = _m.convertColorString(result)
-            Log.e(_m.mTAG, "onPageFinished: $result  $newResult")
+            Log.e(_m.mTAG, "onPageFinished: $result  $newResult  $url")
             if (newResult != "") {
                 _m.bgColor = Color.parseColor(newResult)
-                _m.mySharedPreferences.edit().putInt("${url}bg_color", _m.bgColor).apply()
+                val parsedUrl = URL(url)
+                _m.mySharedPreferences.edit().putInt("${parsedUrl.host}:${parsedUrl.port}bg_color", _m.bgColor).apply()
             }
             Log.e(_m.mTAG, "onPageFinished: ${_m.bgColor}")
             _m.bgColorOK = true
             _m.returnMain()
+        }
+        js = "javascript:(function() {" +
+                "var metas = document.getElementsByTagName('meta');" +
+                    "for (var i = 0; i < metas.length; i++) {" +
+                        "if (metas[i].getAttribute('name') === 'viewport') {" +
+                            "var content = metas[i].getAttribute('content');" +
+                            "if (content.indexOf('viewport-fit=cover') > -1) {" +
+                                "return true;" +
+                            "}" +
+                        "}" +
+                    "}" +
+                "return false;" +
+                "})()"
+        // 在页面加载完成后执行JavaScript代码检查viewport的meta标签
+        view?.evaluateJavascript(js) { result ->
+            Log.e(_m.mTAG, "onPageFinished: result")
+            if (result != "true") {
+                _m.setNotFull()
+            }
         }
     }
 
