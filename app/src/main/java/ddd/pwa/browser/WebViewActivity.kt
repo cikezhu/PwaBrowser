@@ -32,7 +32,6 @@ import java.util.*
 
 class WebViewActivity : AppCompatActivity() {
     val mTAG: String = "WebViewActivity"
-    var isFull: Boolean = true
     lateinit var mySharedPreferences: SharedPreferences
     private lateinit var myWebView: WebView
     private lateinit var myLinearLayout: LinearLayout
@@ -47,12 +46,15 @@ class WebViewActivity : AppCompatActivity() {
     var logoOK: Boolean = false
     var bgColor: Int = 0
     var bgColorOK: Boolean = false
+    private var isFull: Boolean = true
+    var fullOK: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 获取传递过来的网址
         val url = intent.getStringExtra("url")
         mode = intent.getIntExtra("mode", LAUNCH_MODE.SHOW_URL_PAGE.intValue)
         name = intent.getStringExtra("name") ?: "沉浸浏览"
+        isFull = intent.getBooleanExtra("full", true)
         @Suppress("DEPRECATION")
         setTaskDescription(TaskDescription(name))
         if (url == null) {
@@ -89,7 +91,7 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     fun returnMain() {
-        if (logoOK && nameOK && bgColorOK) {
+        if (logoOK && nameOK && bgColorOK && fullOK) {
             if (mode == LAUNCH_MODE.GET_URL_DETAIL.intValue) {
                 Log.e(mTAG, "returnMain: url, $hostUrl")
                 Log.e(mTAG, "returnMain: name, $name")
@@ -97,6 +99,7 @@ class WebViewActivity : AppCompatActivity() {
                 resultIntent.putExtra("url", hostUrl)
                 resultIntent.putExtra("name", name)
                 resultIntent.putExtra("logo", logo)
+                resultIntent.putExtra("full", isFull)
                 setResult(RESULT_OK, resultIntent)
                 finish()
             } else {
@@ -107,11 +110,9 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     fun setNotFull() {
-        if (isFull) {
-            isFull = false
-            val param = myWebView.layoutParams as MarginLayoutParams
-            param.setMargins(0, (statusBarHeight * resources.displayMetrics.density).toInt(), 0, 0)
-        }
+        isFull = false
+        val param = myWebView.layoutParams as MarginLayoutParams
+        param.setMargins(0, (statusBarHeight * resources.displayMetrics.density).toInt(), 0, 0)
     }
 
     fun hideBgLogo() {
@@ -179,7 +180,7 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     // 编码字符串为Base64字符串
-    fun encode(data: String): String {
+    private fun encode(data: String): String {
         return Base64.getEncoder().encodeToString(data.toByteArray())
     }
 
@@ -290,6 +291,9 @@ class WebViewActivity : AppCompatActivity() {
         // 绑定组件 应用背景色和图标
         myWebView = findViewById(R.id.webview_ding)
         myWebView.setBackgroundColor(bgColor)
+        if (!isFull) {
+            setNotFull()
+        }
         myLinearLayout = findViewById(R.id.bg_logo)
         myLinearLayout.setBackgroundColor(bgColor)
         myImageLogo = findViewById(R.id.image_logo)
@@ -426,9 +430,11 @@ private class WVViewClient(private val _context: Context, private val _m: WebVie
         // 在页面加载完成后执行JavaScript代码检查viewport的meta标签
         view?.evaluateJavascript(js) { result ->
             Log.e(_m.mTAG, "onPageFinished: result")
+            _m.fullOK = true
             if (result != "true") {
                 _m.setNotFull()
             }
+            _m.returnMain()
         }
     }
 

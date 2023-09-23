@@ -17,6 +17,7 @@ class LauncherShortcutActivity : AppCompatActivity() {
                 newIntent.putExtra("mode", intent.getIntExtra("mode", LAUNCH_MODE.SHOW_URL_PAGE.intValue))
                 newIntent.putExtra("url", intent.getStringExtra("url"))
                 newIntent.putExtra("name", intent.getStringExtra("name"))
+                newIntent.putExtra("full", intent.getBooleanExtra("full", true))
                 startActivity(newIntent)
             }
         }
