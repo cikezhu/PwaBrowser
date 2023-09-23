@@ -172,18 +172,47 @@ class WebViewActivity : AppCompatActivity() {
             // 如果颜色值以 # 开头，则直接返回该值
             return convertedColorString
         }
-        if (convertedColorString.startsWith("rgb")) {
+        if (convertedColorString.startsWith("rgba")) {
+            val matchResult = Regex("""\d+\.?\d*""").findAll(convertedColorString)
+            val rgbaValues = matchResult.map { it.value.toFloat() }.toList()
+            val alpha = (rgbaValues[3] * 255).toInt()
+            val hexValues = rgbaValues.subList(0, 3).map { String.format("%02X", it.toInt()) }
+            convertedColorString = "#${String.format("%02X", alpha)}${hexValues.joinToString("")}"
+        } else if (convertedColorString.startsWith("rgb")) {
             // 如果颜色值以 rgb 开头，则将其转换为 #RRGGBB 格式的颜色值
             val matchResult = Regex("""\d+""").findAll(convertedColorString)
             val rgbValues = matchResult.map { it.value.toInt() }.toList()
             val hexValues = rgbValues.map { String.format("%02X", it) }
             convertedColorString = "#${hexValues.joinToString(separator = "")}"
-        } else if (convertedColorString.startsWith("argb")) {
-            // 如果颜色值以 argb 开头，则将其转换为 #AARRGGBB 格式的颜色值
-            val matchResult = Regex("""\d+""").findAll(convertedColorString)
-            val argbValues = matchResult.map { it.value.toInt() }.toList()
-            val hexValues = argbValues.map { String.format("%02X", it) }
-            convertedColorString = "#${hexValues[0]}${hexValues.subList(1, 4).joinToString(separator = "")}"
+        } else if (convertedColorString.startsWith("hsl")) {
+            val matchResult = Regex("""\d+\.?\d*%?""").findAll(convertedColorString)
+            val hslValues = matchResult.map { it.value }.toList()
+            val h = hslValues[0].toFloat() / 360
+            val s = hslValues[1].removeSuffix("%").toFloat() / 100
+            val l = hslValues[2].removeSuffix("%").toFloat() / 100
+            val c = (1 - kotlin.math.abs(2 * l - 1)) * s
+            val x = c * (1 - kotlin.math.abs((h * 6) % 2 - 1))
+            val m = l - c / 2
+            var (r, g, b) = when {
+                h < 1 / 6f -> listOf(c, x, 0f)
+                h < 2 / 6f -> listOf(x, c, 0f)
+                h < 3 / 6f -> listOf(0f, c, x)
+                h < 4 / 6f -> listOf(0f, x, c)
+                h < 5 / 6f -> listOf(x, 0f, c)
+                else -> listOf(c, 0f, x)
+            }
+            r += m
+            g += m
+            b += m
+            if (convertedColorString.startsWith("hsla")) {
+                val alpha = hslValues[3].removeSuffix("%").toFloat() / 100
+                r *= alpha
+                g *= alpha
+                b *= alpha
+            }
+            convertedColorString = "#${String.format("%02X%02X%02X", (r * 255).toInt(), (g * 255).toInt(), (b * 255).toInt())}"
+        } else {
+            convertedColorString = ""
         }
         return convertedColorString
     }
