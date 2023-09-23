@@ -70,6 +70,15 @@ class WebViewActivity : AppCompatActivity() {
         bgColor = mySharedPreferences.getInt("${parsedUrl.host}:${parsedUrl.port}bg_color", ContextCompat.getColor(this, R.color.logo_bg))
         // 在设置布局之前设置窗口的背景色
         window.setBackgroundDrawable(ColorDrawable(bgColor))
+        // 在设置布局之前设置状态栏的颜色
+        val isLight = Color.red(bgColor) * 0.299 + Color.green(bgColor) * 0.587 + Color.blue(bgColor) * 0.114 >= 186
+        if (isLight) {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = 0
+        }
         // 获取缓存的图标
         logo = getBitmapFromCache()
         super.onCreate(savedInstanceState)
