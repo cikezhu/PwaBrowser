@@ -235,13 +235,14 @@ class WebViewActivity : AppCompatActivity() {
         // 判断是否为CSS文件
         if (url.endsWith(".css")) {
             // 获取原始CSS文件的输入流
-            var inputStream: InputStream? = null
+            val inputStream: InputStream?
             try {
                 val connection: HttpURLConnection =
                     URL(request.url.toString()).openConnection() as HttpURLConnection
                 inputStream = connection.inputStream
             } catch (e: IOException) {
                 e.printStackTrace()
+                return null
             }
             // 将输入流转换为字符串，并进行相应的替换操作
             var cssString = convertStreamToString(inputStream!!)

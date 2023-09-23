@@ -1,5 +1,6 @@
 package ddd.pwa.browser
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
@@ -10,6 +11,7 @@ import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
@@ -36,11 +38,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         // 绑定组件
         val myInputUrl: EditText = findViewById(R.id.input_url)
+        val myVersion: TextView = findViewById(R.id.version)
+        @Suppress("DEPRECATION") val packageInfo = packageManager.getPackageInfo(packageName, 0)
+        myVersion.text = "v${packageInfo.versionName}  by: 叮叮当"
         val myChangeUrl: Button = findViewById(R.id.button_change_url)
         myChangeUrl.setOnClickListener {
             Log.d(mTAG, "initialize: " + myChangeUrl.text.toString())
