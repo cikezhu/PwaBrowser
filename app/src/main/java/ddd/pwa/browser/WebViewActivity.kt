@@ -22,6 +22,8 @@ import android.view.ViewGroup.MarginLayoutParams
 import android.webkit.*
 import android.widget.ImageView
 import android.widget.LinearLayout
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import java.io.*
@@ -48,6 +50,23 @@ class WebViewActivity : AppCompatActivity() {
     var bgColorOK: Boolean = false
     private var isFull: Boolean = true
     var fullOK: Boolean = false
+    var mFilePathCallback: ValueCallback<Array<Uri>>? = null
+    val launcher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result: ActivityResult ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            // 获取选择的文件URI
+            val data = if (result.data != null) arrayOf(result.data!!.data!!) else emptyArray()
+            Log.e(mTAG, "获取选择的文件: $data")
+            // 调用回调函数，将选择的文件URI传递给WebView
+            mFilePathCallback?.onReceiveValue(data)
+        } else {
+            // 用户取消选择文件，将回调函数置为null
+            mFilePathCallback?.onReceiveValue(null)
+        }
+        // 重置回调函数和参数
+        mFilePathCallback = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 获取传递过来的网址
@@ -68,17 +87,8 @@ class WebViewActivity : AppCompatActivity() {
         mySharedPreferences = getSharedPreferences("mySharedPreferences", MODE_PRIVATE)
         val parsedUrl = URL(url)
         bgColor = mySharedPreferences.getInt("${parsedUrl.host}:${parsedUrl.port}bg_color", ContextCompat.getColor(this, R.color.logo_bg))
-        // 在设置布局之前设置窗口的背景色
-        window.setBackgroundDrawable(ColorDrawable(bgColor))
-        // 在设置布局之前设置状态栏的颜色
-        val isLight = Color.red(bgColor) * 0.299 + Color.green(bgColor) * 0.587 + Color.blue(bgColor) * 0.114 >= 186
-        if (isLight) {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = 0
-        }
+        // 设置背景色和状态栏颜色
+        setActivityColor()
         // 获取缓存的图标
         logo = getBitmapFromCache()
         super.onCreate(savedInstanceState)
@@ -305,6 +315,20 @@ class WebViewActivity : AppCompatActivity() {
         return null
     }
 
+    fun setActivityColor() {
+        // 设置窗口的背景色
+        window.setBackgroundDrawable(ColorDrawable(bgColor))
+        // 设置状态栏的颜色
+        val isLight = Color.red(bgColor) * 0.299 + Color.green(bgColor) * 0.587 + Color.blue(bgColor) * 0.114 >= 186
+        if (isLight) {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = 0
+        }
+    }
+
     private fun initializeServiceWorker() {
         // 配置 Service Worker 拦截
         val swController = ServiceWorkerController.getInstance()
@@ -386,6 +410,23 @@ private class WVChromeClient(private val _context: Context, private val _m: WebV
         _m.logoOK = true
         _m.returnMain()
     }
+
+    @SuppressLint("QueryPermissionsNeeded")
+    override fun onShowFileChooser(
+        webView: WebView?,
+        filePathCallback: ValueCallback<Array<Uri>>?,
+        fileChooserParams: FileChooserParams?
+    ): Boolean {
+        // 创建Intent，用于打开文件选择器
+        val intent = fileChooserParams?.createIntent()
+        // 启动文件选择器
+        _m.launcher.launch(intent)
+        // 保存回调函数，以便在选择文件后调用
+        _m.mFilePathCallback = filePathCallback
+        return true
+    }
+
+
 }
 
 private class WVViewClient(private val _context: Context, private val _m: WebViewActivity):
@@ -447,6 +488,7 @@ private class WVViewClient(private val _context: Context, private val _m: WebVie
             Log.e(_m.mTAG, "onPageFinished: $result  $newResult  $url")
             if (newResult != "") {
                 _m.bgColor = Color.parseColor(newResult)
+                _m.setActivityColor()
                 val parsedUrl = URL(url)
                 _m.mySharedPreferences.edit().putInt("${parsedUrl.host}:${parsedUrl.port}bg_color", _m.bgColor).apply()
             }
