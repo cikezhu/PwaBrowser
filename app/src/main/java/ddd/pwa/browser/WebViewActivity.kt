@@ -439,7 +439,9 @@ private class WVViewClient(private val _context: Context, private val _m: WebVie
     // 非hostUrl从外部浏览器打开
     @Deprecated("Deprecated in Java")
     override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-        if (Uri.parse(url).host?.let { _m.hostUrl.indexOf(it) }!! > -1) {
+        // 1.6.2版本moviePilot 新增新窗口打开日志页面, 在深色模式下, 浏览效果不佳, 因此增加判断从外部浏览器打开
+        if (Uri.parse(url).host?.let { _m.hostUrl.indexOf(it) }!! > -1 &&
+            Uri.parse(url).path?.matches(Regex(".*/api/v\\d+/system/logging$")) != true) {
             return false
         }
         Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
