@@ -368,6 +368,7 @@ class WebViewActivity : AppCompatActivity() {
         // 配置 web view
         WebView.setWebContentsDebuggingEnabled(true)
         val settings: WebSettings = myWebView.settings // webView 配置项
+        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.useWideViewPort = true // 是否启用对视口元标记的支持
         settings.javaScriptEnabled = true // 是否启用 JavaScript
         settings.domStorageEnabled = true // 是否启用本地存储（允许使用 localStorage 等）
