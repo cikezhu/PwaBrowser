@@ -22,6 +22,7 @@ import android.view.ViewGroup.MarginLayoutParams
 import android.webkit.*
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -386,7 +387,15 @@ class WebViewActivity : AppCompatActivity() {
         // myWebView.setDrawingCacheEnabled(true) // 启用或禁用图形缓存
         myWebView.webViewClient = WVViewClient(this, this@WebViewActivity) // 帮助 WebView 处理各种通知、请求事件
         myWebView.webChromeClient = WVChromeClient(this, this@WebViewActivity) // 处理解析，渲染网页
+        myImageLogo.setOnClickListener {
+            // 当长时间无法载入时, 可通过点击图标强制刷新
+            myWebView.stopLoading()
+            myWebView.clearCache(true)
+            myWebView.loadUrl(hostUrl)
+            Toast.makeText(applicationContext,"正在刷新..", Toast.LENGTH_SHORT).show()
+        }
 
+        settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
         myWebView.loadUrl(hostUrl)
     }
 

@@ -154,20 +154,8 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
             iconLauncher.launch(intent)
         }
-        // 设置弹窗内容
-        alertDialogBuilder.setView(dialogView)
-            .setPositiveButton("确定") { dialog, _ ->
-                val newName = nameInput.text.toString()
-                if (newName.isNotEmpty()) {
-                    addShortcut(newName, url, shortcutLogo, full)
-                }
-                dialog.dismiss()
-            }
-            .setNegativeButton("取消") { dialog, _ ->
-                dialog.dismiss()
-            }
         // 显示弹窗
-        val alertDialog = alertDialogBuilder.create()
+        val alertDialog = alertDialogBuilder.setView(dialogView).create()
         alertDialog.window?.setBackgroundDrawable(ColorDrawable(0))
         alertDialog.show()
         // 确定按钮
