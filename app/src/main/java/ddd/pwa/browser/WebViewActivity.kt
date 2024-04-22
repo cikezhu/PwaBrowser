@@ -395,7 +395,7 @@ class WebViewActivity : AppCompatActivity() {
             Toast.makeText(applicationContext,"正在刷新..", Toast.LENGTH_SHORT).show()
         }
 
-        settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+//        settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
         myWebView.loadUrl(hostUrl)
     }
 
