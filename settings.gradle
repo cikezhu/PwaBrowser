@@ -16,5 +16,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "nastool-android"
+rootProject.name = "PwaBrowser"
 include ':app'
