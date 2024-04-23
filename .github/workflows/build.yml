@@ -11,7 +11,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     # 设置jdk环境为1.8
     steps:
@@ -27,6 +26,20 @@ jobs:
           repository: cikezhu/android-keystore
           token: ${{ secrets.TOKEN }} # 连接仓库的token,需要单独配置
           path: keystore # 仓库的根目录名
+      # 获取上一次的TAG
+      - name: Get commit messages
+        run: |
+          oldCommit=$(git rev-list --tags --skip=1 --max-count=1)
+          oldTag=$(git describe --tags --abbrev=0 $oldCommit)
+          echo "Commit old_TAG: $oldTag"
+          echo "old_tag=$oldTag" >> $GITHUB_OUTPUT
+      # 生成更新日志
+      - name: Generate changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4.3.1
+        with:
+          myToken: ${{ secrets.GITHUB_TOKEN }}
+          base-ref: ${{ steps.modified.outputs.old_tag }}
       # 打包release
       - name: Build with Gradle
         run: bash ./gradlew assembleRelease
@@ -46,6 +59,7 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
+          body: ${{ steps.changelog.outputs.changelog }}
           draft: false
           prerelease: false
       # 获取apk版本号
