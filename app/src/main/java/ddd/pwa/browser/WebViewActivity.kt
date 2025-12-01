@@ -406,7 +406,7 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     // 新增：提交自动填充上下文的核心方法
-    private fun commitAutofillContext(currentUrl: String?) {
+    fun commitAutofillContext(currentUrl: String?) {
         if (::autofillManager.isInitialized && autofillManager.isEnabled && !currentUrl.isNullOrBlank()) {
             // 提交当前上下文。系统会自动收集 WebView 中的视图信息和当前 URL，
             // 并将其传递给 Bitwarden 等自动填充服务。
