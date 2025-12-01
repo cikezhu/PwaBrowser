@@ -19,6 +19,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
+import android.view.autofill.AutofillManager // 新增导入
 import android.webkit.*
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -52,6 +53,9 @@ class WebViewActivity : AppCompatActivity() {
     private var isFull: Boolean = true
     var fullOK: Boolean = false
     var mFilePathCallback: ValueCallback<Array<Uri>>? = null
+    // 新增：声明 AutofillManager 变量
+    private lateinit var autofillManager: AutofillManager
+
     val launcher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result: ActivityResult ->
@@ -97,6 +101,8 @@ class WebViewActivity : AppCompatActivity() {
         initializeServiceWorker()
         // 载入界面布局
         setContentView(R.layout.activity_web_view)
+        // 初始化 AutofillManager （新增）
+        autofillManager = getSystemService(AutofillManager::class.java)
         // 初始化webView
         initializeWebView()
     }
@@ -372,7 +378,7 @@ class WebViewActivity : AppCompatActivity() {
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.useWideViewPort = true // 是否启用对视口元标记的支持
         settings.javaScriptEnabled = true // 是否启用 JavaScript
-        settings.domStorageEnabled = true // 是否启用本地存储（允许使用 localStorage 等）
+        settings.domStorageEnabled = true // 是否启用本地存储（允许使用 localStorage 等）—— 对自动填充很重要
         settings.allowFileAccess = true // 是否启用文件访问
         // val appCachePath = applicationContext.cacheDir.absolutePath // 缓存地址
         settings.allowContentAccess = true // 是否启用内容 URL 访问
@@ -382,8 +388,8 @@ class WebViewActivity : AppCompatActivity() {
         settings.builtInZoomControls = true // 是否应使用其内置的缩放机制
         // Hide the zoom controls for HONEYCOMB+
         settings.displayZoomControls = false  // 是否应显示屏幕缩放控件
-        // settings.allowFileAccessFromFileURLs = true // 是否应允许在文件方案 URL 上下文中运行的 JavaScript 访问来自其他文件方案 URL 的内容
-        // settings.allowUniversalAccessFromFileURLs = true // 是否应允许在文件方案URL上下文中运行的 JavaScript 访问任何来源的内容
+        // settings.allowFileAccessFromFileURLs = true // 是否应允许在文件方案 URL 下运行的 JavaScript 访问来自其他文件方案 URL 的内容
+        // settings.allowUniversalAccessFromFileURLs = true // 是否应允许在文件方案URL下运行的 JavaScript 访问任何来源的内容
         // myWebView.setDrawingCacheEnabled(true) // 启用或禁用图形缓存
         myWebView.webViewClient = WVViewClient(this, this@WebViewActivity) // 帮助 WebView 处理各种通知、请求事件
         myWebView.webChromeClient = WVChromeClient(this, this@WebViewActivity) // 处理解析，渲染网页
@@ -397,6 +403,20 @@ class WebViewActivity : AppCompatActivity() {
 
 //        settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
         myWebView.loadUrl(hostUrl)
+    }
+
+    // 新增：提交自动填充上下文的核心方法
+    private fun commitAutofillContext(currentUrl: String?) {
+        if (::autofillManager.isInitialized && autofillManager.isEnabled && !currentUrl.isNullOrBlank()) {
+            // 提交当前上下文。系统会自动收集 WebView 中的视图信息和当前 URL，
+            // 并将其传递给 Bitwarden 等自动填充服务。
+            autofillManager.commit()
+            Log.d(mTAG, "已为URL提交自动填充上下文: $currentUrl")
+        } else {
+            if (!autofillManager.isEnabled) {
+                Log.d(mTAG, "自动填充服务未启用")
+            }
+        }
     }
 
 }
@@ -488,6 +508,9 @@ private class WVViewClient(private val _context: Context, private val _m: WebVie
     //页面加载完成
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
+        // 核心新增：在页面加载完成时，提交当前URL的自动填充上下文
+        _m.commitAutofillContext(url)
+
         // 关闭logo图
         if (_m.firstUpdated) {
             _m.firstUpdated = false
@@ -531,4 +554,12 @@ private class WVViewClient(private val _context: Context, private val _m: WebVie
         }
     }
 
+    // 新增：处理单页应用(SPA)的URL变化
+    override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+        super.doUpdateVisitedHistory(view, url, isReload)
+        // 如果不是普通的页面重载（例如是SPA路由切换），则提交新的自动填充上下文
+        if (!isReload) {
+            _m.commitAutofillContext(url)
+        }
+    }
 }
