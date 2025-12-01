@@ -21,7 +21,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 设置jdk环境为1.8
+    permissions:
+      contents: write  # 添加权限以创建Release
+      
     steps:
       - name: 处理手动触发标签
         if: github.event_name == 'workflow_dispatch'
@@ -36,56 +38,63 @@ jobs:
           # 将手动输入的标签名存储到环境变量，供后续步骤使用
           echo "MANUAL_TAG=$TAG_NAME" >> $GITHUB_ENV
 
-      - uses: actions/checkout@v2
-        # 修改：为手动触发情况指定特定的ref
+      # 更新：使用 checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           ref: ${{ env.MANUAL_TAG || github.ref }}
+          fetch-depth: 0  # 获取完整历史记录以便查找标签
 
       - name: 为手动触发生成伪标签引用
         if: github.event_name == 'workflow_dispatch'
         run: |
-          # 为了使后续获取“上一个TAG”的步骤能正常工作，我们手动设置一个引用。
-          # 这会创建一个临时引用，使 `git describe` 等命令可以找到“前一个”标签。
           echo "设置临时引用以便生成更新日志..."
-          # 找出最新的一个真实标签作为“旧标签”的参照
-          LATEST_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --max-count=1) 2>/dev/null || echo "")
+          # 找出最新的一个真实标签作为"旧标签"的参照
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -n "$LATEST_TAG" ]; then
             echo "找到最新标签: $LATEST_TAG"
-            # 模拟出当前手动标签是基于这个最新标签的
             echo "SIMULATED_BASE_REF=$LATEST_TAG" >> $GITHUB_ENV
           else
             echo "未找到任何现有标签，这可能是第一次发布。"
             echo "SIMULATED_BASE_REF=" >> $GITHUB_ENV
           fi
 
-      - name: set up JDK 11
-        uses: actions/setup-java@v1
+      # 更新：使用 setup-java@v4
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
         with:
-          java-version: 11
+          java-version: '11'
+          distribution: 'temurin'
 
       # 获取打包秘钥
+      # 更新：使用 checkout@v4
       - name: Checkout Android Keystore
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: cikezhu/android-keystore
-          token: ${{ secrets.TOKEN }} # 连接仓库的token,需要单独配置
-          path: keystore # 仓库的根目录名
+          token: ${{ secrets.TOKEN }}
+          path: keystore
 
       # 获取上一次的TAG
       - name: Get commit messages
         id: get_old_tag
         run: |
-          # 判断触发方式，决定如何获取“上一个TAG”
+          # 判断触发方式，决定如何获取"上一个TAG"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # 手动触发：使用我们之前找到的最新标签
             OLD_TAG="${{ env.SIMULATED_BASE_REF }}"
             echo "手动触发模式，上一个TAG: $OLD_TAG"
           else
             # 自动触发（推送标签）：沿用原有逻辑
-            oldCommit=$(git rev-list --tags --skip=1 --max-count=1)
-            oldTag=$(git describe --tags --abbrev=0 $oldCommit 2>/dev/null || echo "")
-            echo "自动触发模式，上一个TAG: $oldTag"
-            OLD_TAG="$oldTag"
+            oldCommit=$(git rev-list --tags --skip=1 --max-count=1 2>/dev/null || echo "")
+            if [ -n "$oldCommit" ]; then
+              oldTag=$(git describe --tags --abbrev=0 $oldCommit 2>/dev/null || echo "")
+              echo "自动触发模式，上一个TAG: $oldTag"
+              OLD_TAG="$oldTag"
+            else
+              echo "自动触发模式，未找到上一个TAG"
+              OLD_TAG=""
+            fi
           fi
           echo "old_tag=$OLD_TAG" >> $GITHUB_OUTPUT
           echo "最终用于生成更新日志的old_tag: $OLD_TAG"
@@ -102,32 +111,29 @@ jobs:
       - name: Build with Gradle
         run: bash ./gradlew assembleRelease
 
-      # 创建release
+      # 创建release - 更新到现代方法
       - name: Create Release
         id: create_release
-        # 修改：手动触发时，也创建Release
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # 更新：使用现代release action
+        uses: softprops/action-gh-release@v1
         with:
-          # 关键修改：根据触发类型决定tag_name
           tag_name: ${{ github.event.inputs.version_tag || github.ref_name }}
-          release_name: Release ${{ github.event.inputs.version_tag || github.ref_name }}
+          name: Release ${{ github.event.inputs.version_tag || github.ref_name }}
           body: |
             # 手动触发发布
             ${{ github.event.inputs.version_tag && format('**手动触发版本：{0}**', github.event.inputs.version_tag) || '' }}
             
             ${{ steps.changelog.outputs.changelog }}
             
-            *工作流触发方式：{0}* 
-            ${{ github.event_name == 'workflow_dispatch' && '网页手动操作' || 'Git标签推送' }}
+            *工作流触发方式：${{ github.event_name == 'workflow_dispatch' && '网页手动操作' || 'Git标签推送' }}*
           draft: false
           prerelease: false
+          generate_release_notes: false
 
       # 获取apk版本号
       - name: Get Version Name
-        uses: actions/github-script@v3
+        uses: actions/github-script@v6  # 更新到v6
         id: get-version
         with:
           script: |
@@ -146,23 +152,24 @@ jobs:
             }
           result-encoding: string
 
-      # 上传至release的资源
+      # 上传至release的资源 - 更新到现代方法
       - name: Upload Release Asset
-        id: upload-release-asset
-        # 修改：仅在创建了Release后上传
+        # 更新：使用与Create Release相同的action
         if: steps.create_release.outputs.upload_url
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: app/build/outputs/apk/release/app-release.apk
-          asset_name: PwaBrowser-${{steps.get-version.outputs.result}}.apk
-          asset_content_type: application/vnd.android.package-archive
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+          tag_name: ${{ github.event.inputs.version_tag || github.ref_name }}
 
-      # 存档打包的文件
+      # 存档打包的文件 - 关键修复：更新到 upload-artifact@v4
       - name: Archive production artifacts
-        uses: actions/upload-artifact@v2
+        # 更新：使用 upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: build-${{ github.event.inputs.version_tag || github.ref_name }}
-          path: app/build/outputs
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/mapping/release/*.txt
+            app/build/outputs/mapping/release/*.map
+          retention-days: 30  # 可选：设置产物保留天数
