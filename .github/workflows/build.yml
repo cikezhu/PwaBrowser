@@ -1,183 +1,168 @@
 name: Android CI
 
-# 触发器配置
+# 触发器
 on:
-  # 1. 手动触发（网页操作）
+  # 新增：网页手动触发
   workflow_dispatch:
     inputs:
       version_tag:
-        description: '版本标签 (例如: v1.0.0)'
+        description: '要创建和编译的版本标签 (例如: v1.0.1)'
         required: true
         type: string
         default: 'v1.0.0'
-      create_release:
-        description: '是否创建GitHub Release'
-        required: false
-        type: boolean
-        default: true
-      release_notes:
-        description: '发布说明'
-        required: false
-        type: string
-        default: ''
-
-  # 2. 自动触发：推送标签时
+  # 原有触发器保持不变
   push:
     tags:
-      - 'v*'
-  
-  # 3. 自动触发：拉取请求到主分支时
+      - v*
   pull_request:
-    branches: [ main, master ]
-
-# 工作流权限
-permissions:
-  contents: write  # 允许创建标签和发布
-  actions: read
+    tags:
+      - v*
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    # 设置jdk环境为1.8
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  # 获取所有历史记录，便于打标签
-          
-      # 如果是手动触发，创建标签
-      - name: 创建Git标签（仅手动触发）
+      - name: 处理手动触发标签
         if: github.event_name == 'workflow_dispatch'
         run: |
           TAG_NAME="${{ github.event.inputs.version_tag }}"
-          
+          echo "手动触发，目标标签：$TAG_NAME"
           # 检查标签格式
-          if [[ ! $TAG_NAME =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-            echo "❌ 标签格式错误，请使用类似 v1.0.0 的格式"
+          if [[ ! $TAG_NAME =~ ^v.*$ ]]; then
+            echo "错误：标签名应以 'v' 开头"
             exit 1
           fi
-          
-          # 检查标签是否已存在
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "⚠️  标签 $TAG_NAME 已存在，使用现有标签"
-          else
-            # 创建新标签
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git tag $TAG_NAME
-            git push origin $TAG_NAME
-            echo "✅ 已创建并推送标签: $TAG_NAME"
-          fi
-          
-          # 设置环境变量供后续步骤使用
-          echo "RELEASE_TAG=$TAG_NAME" >> $GITHUB_ENV
-          echo "SHOULD_CREATE_RELEASE=${{ github.event.inputs.create_release }}" >> $GITHUB_ENV
-          echo "RELEASE_NOTES=${{ github.event.inputs.release_notes }}" >> $GITHUB_ENV
-          
-      # 设置JDK环境
-      - name: 设置JDK 11
-        uses: actions/setup-java@v3
+          # 将手动输入的标签名存储到环境变量，供后续步骤使用
+          echo "MANUAL_TAG=$TAG_NAME" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v2
+        # 修改：为手动触发情况指定特定的ref
         with:
-          java-version: '11'
-          distribution: 'temurin'
-          
+          ref: ${{ env.MANUAL_TAG || github.ref }}
+
+      - name: 为手动触发生成伪标签引用
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # 为了使后续获取“上一个TAG”的步骤能正常工作，我们手动设置一个引用。
+          # 这会创建一个临时引用，使 `git describe` 等命令可以找到“前一个”标签。
+          echo "设置临时引用以便生成更新日志..."
+          # 找出最新的一个真实标签作为“旧标签”的参照
+          LATEST_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --max-count=1) 2>/dev/null || echo "")
+          if [ -n "$LATEST_TAG" ]; then
+            echo "找到最新标签: $LATEST_TAG"
+            # 模拟出当前手动标签是基于这个最新标签的
+            echo "SIMULATED_BASE_REF=$LATEST_TAG" >> $GITHUB_ENV
+          else
+            echo "未找到任何现有标签，这可能是第一次发布。"
+            echo "SIMULATED_BASE_REF=" >> $GITHUB_ENV
+          fi
+
+      - name: set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+
       # 获取打包秘钥
-      - name: 检出Android Keystore
-        uses: actions/checkout@v3
+      - name: Checkout Android Keystore
+        uses: actions/checkout@v2
         with:
           repository: cikezhu/android-keystore
-          token: ${{ secrets.TOKEN }}
-          path: keystore
-          
-      # 获取版本信息
-      - name: 确定版本标签
-        id: version_info
+          token: ${{ secrets.TOKEN }} # 连接仓库的token,需要单独配置
+          path: keystore # 仓库的根目录名
+
+      # 获取上一次的TAG
+      - name: Get commit messages
+        id: get_old_tag
         run: |
-          # 如果是手动触发，使用环境变量中的标签
+          # 判断触发方式，决定如何获取“上一个TAG”
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "当前标签: ${{ env.RELEASE_TAG }}"
-            echo "tag_name=${{ env.RELEASE_TAG }}" >> $GITHUB_OUTPUT
-            echo "create_release=${{ env.SHOULD_CREATE_RELEASE }}" >> $GITHUB_OUTPUT
-            
-            # 获取上一个标签
-            if git describe --tags --abbrev=0 "${{ env.RELEASE_TAG }}"^ 2>/dev/null; then
-              OLD_TAG=$(git describe --tags --abbrev=0 "${{ env.RELEASE_TAG }}"^)
-            else
-              OLD_TAG=""
-            fi
+            # 手动触发：使用我们之前找到的最新标签
+            OLD_TAG="${{ env.SIMULATED_BASE_REF }}"
+            echo "手动触发模式，上一个TAG: $OLD_TAG"
           else
-            # 如果是自动触发，使用当前标签
-            TAG_NAME=${GITHUB_REF#refs/tags/}
-            echo "当前标签: $TAG_NAME"
-            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-            echo "create_release=true" >> $GITHUB_OUTPUT
-            
-            # 获取上一个标签
-            if git rev-list --tags --skip=1 --max-count=1 2>/dev/null; then
-              OLD_COMMIT=$(git rev-list --tags --skip=1 --max-count=1)
-              OLD_TAG=$(git describe --tags --abbrev=0 $OLD_COMMIT 2>/dev/null || echo "")
-            else
-              OLD_TAG=""
-            fi
+            # 自动触发（推送标签）：沿用原有逻辑
+            oldCommit=$(git rev-list --tags --skip=1 --max-count=1)
+            oldTag=$(git describe --tags --abbrev=0 $oldCommit 2>/dev/null || echo "")
+            echo "自动触发模式，上一个TAG: $oldTag"
+            OLD_TAG="$oldTag"
           fi
-          
-          echo "上一个标签: $OLD_TAG"
           echo "old_tag=$OLD_TAG" >> $GITHUB_OUTPUT
-          
+          echo "最终用于生成更新日志的old_tag: $OLD_TAG"
+
       # 生成更新日志
-      - name: 生成更新日志
+      - name: Generate changelog
         id: changelog
         uses: metcalfc/changelog-generator@v4.3.1
         with:
           myToken: ${{ secrets.GITHUB_TOKEN }}
-          base-ref: ${{ steps.version_info.outputs.old_tag }}
-          
-      # 构建APK
-      - name: 使用Gradle构建
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease
-          
-      # 创建Release（手动触发时根据设置决定，自动触发时总是创建）
-      - name: 创建GitHub Release
+          base-ref: ${{ steps.get_old_tag.outputs.old_tag }}
+
+      # 打包release
+      - name: Build with Gradle
+        run: bash ./gradlew assembleRelease
+
+      # 创建release
+      - name: Create Release
         id: create_release
-        if: steps.version_info.outputs.create_release == 'true'
-        uses: softprops/action-gh-release@v1
+        # 修改：手动触发时，也创建Release
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.version_info.outputs.tag_name }}
-          name: Release ${{ steps.version_info.outputs.tag_name }}
+          # 关键修改：根据触发类型决定tag_name
+          tag_name: ${{ github.event.inputs.version_tag || github.ref_name }}
+          release_name: Release ${{ github.event.inputs.version_tag || github.ref_name }}
           body: |
-            # 发布说明
+            # 手动触发发布
+            ${{ github.event.inputs.version_tag && format('**手动触发版本：{0}**', github.event.inputs.version_tag) || '' }}
             
-            ${{ env.RELEASE_NOTES }}
-            
-            ## 更新日志
             ${{ steps.changelog.outputs.changelog }}
             
-            ---
-            *构建信息*
-            - 触发方式: ${{ github.event_name }}
-            - 触发时间: ${{ github.event.created_at }}
-            - Commit: ${{ github.sha }}
+            *工作流触发方式：{0}* 
+            ${{ github.event_name == 'workflow_dispatch' && '网页手动操作' || 'Git标签推送' }}
           draft: false
           prerelease: false
-          generate_release_notes: false
-          
-      # 上传APK到Release
-      - name: 上传Release资源
-        if: steps.version_info.outputs.create_release == 'true'
-        uses: softprops/action-gh-release@v1
+
+      # 获取apk版本号
+      - name: Get Version Name
+        uses: actions/github-script@v3
+        id: get-version
         with:
-          tag_name: ${{ steps.version_info.outputs.tag_name }}
-          files: |
-            app/build/outputs/apk/release/app-release.apk
-          append_body: false
-          
-      # 归档构建产物
-      - name: 归档生产构建产物
-        uses: actions/upload-artifact@v3
+          script: |
+            // 根据触发类型决定版本号来源
+            if (context.payload.inputs) {
+              // 手动触发：使用输入的version_tag
+              const manualTag = context.payload.inputs.version_tag;
+              console.log(`手动触发，使用标签: ${manualTag}`);
+              return manualTag.replace('refs/tags/', '');
+            } else {
+              // 自动触发：从GITHUB_REF提取
+              const str = process.env.GITHUB_REF;
+              const tag = str.substring(str.lastIndexOf('/') + 1);
+              console.log(`自动触发，从REF提取标签: ${tag}`);
+              return tag;
+            }
+          result-encoding: string
+
+      # 上传至release的资源
+      - name: Upload Release Asset
+        id: upload-release-asset
+        # 修改：仅在创建了Release后上传
+        if: steps.create_release.outputs.upload_url
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: android-build-${{ steps.version_info.outputs.tag_name }}
-          path: |
-            app/build/outputs/apk/
-            app/build/outputs/mapping/
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: app/build/outputs/apk/release/app-release.apk
+          asset_name: PwaBrowser-${{steps.get-version.outputs.result}}.apk
+          asset_content_type: application/vnd.android.package-archive
+
+      # 存档打包的文件
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-${{ github.event.inputs.version_tag || github.ref_name }}
+          path: app/build/outputs
